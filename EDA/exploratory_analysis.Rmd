@@ -1,0 +1,379 @@
+---
+title: "Exploratory Analysis on Traits"
+author: "Xianwen He"
+date: "2024-11-19"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+## Load Traits in Interest
+
+```{r}
+# load full data set
+alldata <- readRDS("../Data/alldata.rds")
+```
+
+
+```{r}
+traits.in.interest <- c('id', "PMAT24_A_CR", "ReadEng_AgeAdj", "PicVocab_AgeAdj",
+                        "IWRD_TOT", "ProcSpeed_AgeAdj", "VSPLOT_TC", "SCPT_TPRT",
+                        "ListSort_AgeAdj", "PicSeq_AgeAdj",
+                        "SSAGA_ChildhoodConduct", "SSAGA_Alc_12_Frq_Drk", "SSAGA_TB_Reg_CPD",
+                        'SSAGA_Times_Used_Illicits', 'SSAGA_Times_Used_Stimulants',
+                        'Height', 'BMI', 'SSAGA_Income', 'SSAGA_Educ', 'age', 'gender',
+                        'ASR_Attn_Raw', 'ASR_Totp_Raw', 'DSM_Adh_Raw')
+```
+
+
+
+## Data Screening and Processing
+
+```{r}
+demographic.data <- alldata %>% select(all_of(traits.in.interest))
+```
+
+### Cognitive Scores
+
+```{r}
+summary(demographic.data %>% select("PMAT24_A_CR", "ReadEng_AgeAdj", "PicVocab_AgeAdj",
+                        "IWRD_TOT", "ProcSpeed_AgeAdj", "VSPLOT_TC", "SCPT_TPRT",
+                        "ListSort_AgeAdj", "PicSeq_AgeAdj"))
+```
+### Psychiatric History
+
+```{r}
+table(demographic.data$SSAGA_ChildhoodConduct)
+
+# set to binary variable
+demographic.data$SSAGA_ChildhoodConduct_binary <- factor(demographic.data$SSAGA_ChildhoodConduct > 0, levels=c(F, T))
+table(demographic.data$SSAGA_ChildhoodConduct_binary)
+```
+
+
+### Substance Abuse
+
+`SSAGA_Alc_12_Frq_Drk` and `SSAGA_TB_Reg_CPD`
+```{r}
+table(demographic.data$SSAGA_Alc_12_Frq_Drk)
+table(demographic.data$SSAGA_TB_Reg_CPD)
+sum(is.na(demographic.data$SSAGA_TB_Reg_CPD))  # too many NAs. Discard this variable
+```
+```{r}
+# the frequency of being drunk
+drk_ordered <-  rep(NA, nrow(demographic.data))
+drk_ordered[demographic.data$SSAGA_Alc_12_Frq_Drk==1] <- 1  # male-low-freq
+drk_ordered[demographic.data$SSAGA_Alc_12_Frq_Drk==2] <- 1  # female-low-freq
+drk_ordered[demographic.data$SSAGA_Alc_12_Frq_Drk==3] <- 2  # high-freq
+drk_ordered[demographic.data$SSAGA_Alc_12_Frq_Drk==4] <- 0  # never
+demographic.data$SSAGA_Alc_12_Frq_Drk_ordered <- factor(drk_ordered, levels=c(0, 1, 2), ordered=TRUE)
+
+# whether or not drunk
+demographic.data$SSAGA_Alc_12_Frq_Drk_binary <- factor(demographic.data$SSAGA_Alc_12_Frq_Drk<4, levels=c(F, T))
+```
+
+
+`SSAGA_Times_Used_Illicits` and `SSAGA_Times_Used_Stimulants`
+```{r}
+table(demographic.data$SSAGA_Times_Used_Illicits)
+table(demographic.data$SSAGA_Times_Used_Stimulants)
+```
+
+```{r}
+# convert to binary for data balance
+demographic.data$SSAGA_Times_Used_Illicits_binary <- factor(demographic.data$SSAGA_Times_Used_Illicits > 0, levels=c(F, T))
+demographic.data$SSAGA_Times_Used_Stimulants_binary <- factor(demographic.data$SSAGA_Times_Used_Stimulants > 0, levels=c(F, T))
+
+summary(demographic.data %>% select(SSAGA_Times_Used_Illicits_binary, SSAGA_Times_Used_Stimulants_binary))
+```
+
+### Attention Scores
+
+`ASR_Attn_Raw`, `ASR_Totp_Raw`, and `DSM_Adh_Raw`.
+```{r}
+summary(demographic.data %>% select('ASR_Attn_Raw', 'ASR_Totp_Raw', 'DSM_Adh_Raw'))
+```
+
+### Demographic and Health Information
+
+`Height` and `BMI`
+```{r}
+summary(demographic.data %>% select('Height', 'BMI'))
+```
+`SSAGA_Income` and `SSAGA_Educ`
+
+```{r}
+table(demographic.data$SSAGA_Income)
+table(demographic.data$SSAGA_Educ)
+```
+
+Convert `SSAGA_Income` and `SSAGA_Educ` into ordered categorical variable.
+```{r}
+demographic.data$SSAGA_Income_ordered <- factor(demographic.data$SSAGA_Income, 
+                                                levels = 1:8, ordered=T)
+
+demographic.data$SSAGA_Educ_ordered <- factor(demographic.data$SSAGA_Educ,
+                                      levels=11:17, ordered=T)
+```
+
+
+`Age` and `Gender`
+```{r}
+summary(demographic.data$age)
+```
+
+```{r}
+table(demographic.data$gender)
+```
+```{r}
+demographic.data$gender_factor <- factor(demographic.data$gender-1, levels=c(0, 1), ordered=FALSE)
+table(demographic.data$gender_factor)
+```
+
+
+## Exploratory Analysis
+
+### Attention Scores
+
+```{r}
+ggplot(demographic.data, aes(x = ASR_Attn_Raw, y = DSM_Adh_Raw)) +
+  geom_point(size = 3) +
+  labs(
+    title = "ASR_Attn_Raw v.s. DSM_Adh_Raw",
+    x = "ASR_Attn_Raw", y = "DSM_Adh_Raw") +
+  theme_minimal(base_size=12)
+```
+
+```{r}
+ggplot(demographic.data, aes(x = ASR_Totp_Raw, y = DSM_Adh_Raw)) +
+  geom_point(size = 3) +
+  labs(
+    title = "ASR_Totp_Raw v.s. DSM_Adh_Raw",
+    x = "ASR_Totp_Raw", y = "DSM_Adh_Raw") +
+  theme_minimal(base_size=12)
+```
+
+In the following texts, we are going to focus on `DSM_Adh_Raw`.
+
+```{r}
+ggplot(demographic.data, aes(x = DSM_Adh_Raw)) +
+  geom_histogram(binwidth = 2, fill = "lightblue", color = "blue", alpha=0.7) +
+  labs(title = "Histogram of DSM_Adh_Raw", x = "", y = "") +
+  theme_minimal(base_size=12)
+
+ggplot(demographic.data, aes(x = log(DSM_Adh_Raw+1))) +
+  geom_histogram(binwidth = 0.5, fill = "lightblue", color = "blue", alpha=0.7) +
+  labs(title = "Histogram of DSM_Adh_Raw", x = "", y = "") +
+  theme_minimal(base_size=12)
+```
+```{r}
+demographic.data$DSM_Adh_Raw_log <- log(demographic.data$DSM_Adh_Raw+1)
+```
+
+
+### Substance Abuse
+
+**SSAGA_Times_Used_Illicits_binary**
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Times_Used_Illicits_binary)), aes(x = SSAGA_Times_Used_Illicits_binary, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_Times_Used_Illicits",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+**SSAGA_Times_Used_Stimulants_binary**
+
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Times_Used_Stimulants_binary)), aes(x = SSAGA_Times_Used_Stimulants_binary, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_Times_Used_Stimulants",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+**SSAGA_Alc_12_Frq_Drk_ordered**
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Alc_12_Frq_Drk_ordered)), aes(x = SSAGA_Alc_12_Frq_Drk_ordered, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_Alc_12_Frq_Drk_ordered",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Alc_12_Frq_Drk_binary)), aes(x = SSAGA_Alc_12_Frq_Drk_binary, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "ADSM_Adh_Raw by SSAGA_Alc_12_Frq_Drk_binary",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+Maintain `SSAGA_Alc_12_Frq_Drk_binary`.
+
+
+### Phychiatric History
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_ChildhoodConduct_binary)), aes(x = SSAGA_ChildhoodConduct_binary, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_ChildhoodConduct_binary",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+### Demographic Information
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Educ_ordered)), aes(x = SSAGA_Educ_ordered, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_Educ_ordered",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+```{r}
+ggplot(demographic.data %>% filter(!is.na(SSAGA_Income_ordered)), aes(x = SSAGA_Income_ordered, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by SSAGA_Income_ordered",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+Education and family income cannot distinguish the DSM scores.
+
+
+**BMI** and **height**
+
+```{r}
+ggplot(demographic.data, aes(x = BMI, y = DSM_Adh_Raw)) +
+  geom_point(size = 3) +
+  labs(
+    title = "BMI v.s. DSM_Adh_Raw",
+    x = "BMI", y = "DSM_Adh_Raw") +
+  theme_minimal(base_size=12)
+```
+
+```{r}
+ggplot(demographic.data, aes(x = Height, y = DSM_Adh_Raw)) +
+  geom_point(size = 3) +
+  labs(
+    title = "Height v.s. DSM_Adh_Raw",
+    x = "Height", y = "DSM_Adh_Raw") +
+  theme_minimal(base_size=12)
+```
+
+**gender**
+
+```{r}
+ggplot(demographic.data, aes(x = gender_factor, y = DSM_Adh_Raw)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs( 
+    title = "DSM_Adh_Raw by gender",
+    x = "", y = "") + 
+  theme_minimal(base_size=12)
+```
+
+**Age**
+```{r}
+ggplot(demographic.data, aes(x = age, y = DSM_Adh_Raw)) +
+  geom_point(size = 3) +
+  labs(
+    title = "age v.s. DSM_Adh_Raw",
+    x = "age", y = "DSM_Adh_Raw") +
+  theme_minimal(base_size=12)
+```
+
+### Cognitive Scores
+
+```{r}
+cogn.dat <- demographic.data %>% select("PMAT24_A_CR", "ReadEng_AgeAdj", "PicVocab_AgeAdj",
+                        "IWRD_TOT", "ProcSpeed_AgeAdj", "VSPLOT_TC", "SCPT_TPRT",
+                        "ListSort_AgeAdj", "PicSeq_AgeAdj", 'DSM_Adh_Raw', 'DSM_Adh_Raw_log')
+cogn.dat <- na.omit(cogn.dat)
+```
+
+```{r}
+cogn.lm <- lm(DSM_Adh_Raw~PMAT24_A_CR+ReadEng_AgeAdj+PicVocab_AgeAdj+IWRD_TOT+ProcSpeed_AgeAdj+VSPLOT_TC+SCPT_TPRT+ListSort_AgeAdj+PicSeq_AgeAdj, data=cogn.dat)
+cogn.log.lm <- lm(DSM_Adh_Raw_log~PMAT24_A_CR+ReadEng_AgeAdj+PicVocab_AgeAdj+IWRD_TOT+ProcSpeed_AgeAdj+VSPLOT_TC+SCPT_TPRT+ListSort_AgeAdj+PicSeq_AgeAdj, data=cogn.dat)
+```
+
+
+```{r}
+summary(cogn.lm)
+```
+
+```{r}
+summary(cogn.log.lm )
+```
+
+### Save Data
+
+Save the converted demographic data set.
+```{r}
+save(demographic.data, file='../Data/demographic.data.RData')
+```
+
+
+## Modeling
+
+### Data for Modeling
+
+```{r}
+traits.log.dat <- demographic.data %>% select('id', "PMAT24_A_CR", "ReadEng_AgeAdj", "PicVocab_AgeAdj",
+                        "IWRD_TOT", "ProcSpeed_AgeAdj", "VSPLOT_TC", "SCPT_TPRT",
+                        "ListSort_AgeAdj", "PicSeq_AgeAdj",
+                        "SSAGA_ChildhoodConduct_binary", "SSAGA_Alc_12_Frq_Drk_binary",
+                        'SSAGA_Times_Used_Illicits_binary', 'SSAGA_Times_Used_Stimulants_binary',
+                        'BMI', 'gender_factor',
+                        'DSM_Adh_Raw_log')
+
+traits.dat <- demographic.data %>% select('id', "PMAT24_A_CR", "ReadEng_AgeAdj", "PicVocab_AgeAdj",
+                        "IWRD_TOT", "ProcSpeed_AgeAdj", "VSPLOT_TC", "SCPT_TPRT",
+                        "ListSort_AgeAdj", "PicSeq_AgeAdj",
+                        "SSAGA_ChildhoodConduct_binary", "SSAGA_Alc_12_Frq_Drk_binary",
+                        'SSAGA_Times_Used_Illicits_binary', 'SSAGA_Times_Used_Stimulants_binary',
+                        'BMI', 'gender_factor',
+                        'DSM_Adh_Raw')
+
+traits.dat <- na.omit(traits.dat)
+traits.log.dat <- na.omit(traits.log.dat)
+```
+
+```{r}
+save(traits.log.dat, file='../Data/traits.log.dat.RData')
+save(traits.dat, file='../Data/traits.dat.RData')
+```
+
+
+### Linear Regression
+
+```{r}
+traits.log.lm <- lm(DSM_Adh_Raw_log~., data=traits.log.dat[, -1])
+traits.lm <- lm(DSM_Adh_Raw~., data=traits.dat[, -1])
+```
+
+```{r}
+summary(traits.log.lm)
+```
+
+```{r}
+summary(traits.lm)
+```
+
+
+
